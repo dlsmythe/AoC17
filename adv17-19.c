@@ -10,6 +10,7 @@
 
 char found_letters[100];
 int num_found_letters;
+int verbose = 0;
 
 int numrows = 0;
 struct row_s {
@@ -22,29 +23,23 @@ void add_row(char *s, int n)
 {
     map[numrows].len = n;
     map[numrows].data = strdup(s);
-    //printf("map[%3d]: len=%3d data='%s'\n", numrows, map[numrows].len, map[numrows].data);
     numrows++;
 }
 
 char val_at(int row, int col)
 {
     if (row < 0) {
-//	printf("smallrow\n");
 	return ' ';
     }
     if (col < 0) {
-//	printf("smallcol\n");
 	return ' ';
     }
     if (row >= numrows) {
-//	printf("bigrow\n");
 	return ' ';
     }
     if (col >= map[row].len) {
-//	printf("bigcol\n");
 	return ' ';
     }
-//    printf("val_at(%d,%d) = %c\n", row, col, map[row].data[col]);
     return map[row].data[col];
 }
 
@@ -96,130 +91,73 @@ struct coord_s {
     { 0, -1 }
 };
 
+direct_t turn_dir[4][4] = {
+    { }, // UP
+    { DIR_RIGHT, DIR_DOWN, DIR_LEFT, DIR_UP }, // turning RIGHT
+    { }, // DOWN
+    { DIR_LEFT, DIR_UP, DIR_RIGHT, DIR_DOWN } // turning LEFT
+};
+
+int step_count;
+
+int cell_in_dir(direct_t cur_dir, int cur_row, int cur_col, int *next_row_p, int *next_col_p)
+{
+    int r, c;
+    if (!next_row_p) {
+	next_row_p = &r;
+	next_col_p = &c;
+    }
+    *next_row_p = cur_row + dir_off[cur_dir].row;
+    *next_col_p = cur_col + dir_off[cur_dir].col;
+    return val_at(*next_row_p, *next_col_p);
+}
+
+int go_forward(direct_t cur_dir, int *row_p, int *col_p)
+{
+    int n_row, n_col;
+    char c = cell_in_dir(cur_dir, *row_p, *col_p, &n_row, &n_col);
+
+    if (' ' == c) {
+	return 0;
+    }
+    if (isalpha(c)) {
+	found_letters[num_found_letters++] = c;
+    }
+
+    *row_p = n_row;
+    *col_p = n_col;
+    return 1;
+}
+
+int turn(direct_t desired_turn, direct_t *cur_dir_p, int row, int col)
+{
+    assert(desired_turn == DIR_LEFT || desired_turn == DIR_RIGHT);
+    direct_t d = turn_dir[desired_turn][*cur_dir_p];
+    char c = cell_in_dir(d, row, col, NULL, NULL);
+
+    if (' ' == c) {
+	return 0;
+    }
+
+    *cur_dir_p = d;
+    return 1;
+}
+
 direct_t next_cell(direct_t cur_dir, int *row_p, int *col_p)
 {
-    struct coord_s u, r, d, l;
-    char c_u, c_r, c_d, c_l;
-    u.row = *row_p + dir_off[DIR_UP].row;
-    u.col = *col_p + dir_off[DIR_UP].col;
-    r.row = *row_p + dir_off[DIR_RIGHT].row;
-    r.col = *col_p + dir_off[DIR_RIGHT].col;
-    d.row = *row_p + dir_off[DIR_DOWN].row;
-    d.col = *col_p + dir_off[DIR_DOWN].col;
-    l.row = *row_p + dir_off[DIR_LEFT].row;
-    l.col = *col_p + dir_off[DIR_LEFT].col;
-    c_u = val_at(u.row, u.col);
-    c_r = val_at(r.row, r.col);
-    c_d = val_at(d.row, d.col);
-    c_l = val_at(l.row, l.col);
-    switch (cur_dir) {
-    default:
-	errx(1, "bad dir");
-    case DIR_UP:
-	printf("next char UP is '%c' at (%d,%d)\n", c_u, u.row, u.col);
-	if (isalpha(c_u)) {
-	    found_letters[num_found_letters++] = c_u;
-	    (*row_p)--;
-	    return DIR_UP;
+    if (go_forward(cur_dir, row_p, col_p)) {
+	step_count++;
+    } else {
+	if (verbose) printf("Can't go fwd from (%d,%d)\n", *row_p, *col_p);
+	if (!turn(DIR_LEFT, &cur_dir, *row_p, *col_p)) {
+	    if (verbose) printf("Can't turn left from (%d,%d)\n", *row_p, *col_p);
+	    if (!turn(DIR_RIGHT, &cur_dir, *row_p, *col_p)) {
+		if (verbose) printf("Can't turn right from (%d,%d) - THE END!\n", *row_p, *col_p);
+		return DIR_LAST;
+	    }
 	}
-	if ('-' == c_u  ||  '|' == c_u  ||  '+' == c_u) {
-	    (*row_p)--;
-	    return DIR_UP;
-	}
-	// have to turn or quit
-	if (c_l == ' ' &&  c_u == ' ' &&  c_r == ' ') {
-	    // reached the end
-	    break;
-	}
-	if (c_l == '-'  &&  c_r == '-') {
-	    errx(1, "multiple directional choices going %s from (%d,%d)", dir_name(cur_dir), *row_p, *col_p);
-	}
-	if (c_l == '-') {
-	    (*col_p)--;
-	    return DIR_LEFT;
-	}
-	(*col_p)++;
-	return DIR_RIGHT;
-
-    case DIR_RIGHT:
-	printf("next char RIGHT is '%c' at (%d,%d)\n", c_r, r.row, r.col);
-	if (isalpha(c_r)) {
-	    found_letters[num_found_letters++] = c_r;
-	    (*col_p)++;
-	    return DIR_RIGHT;
-	}
-	if ('-' == c_r  ||  '|' == c_r) {
-	    (*col_p)++;
-	    return DIR_RIGHT;
-	}
-	// have to turn or quit
-	if (c_d == ' ' &&  c_u == ' ' &&  c_r == ' ') {
-	    // reached the end
-	    break;
-	}
-	if (c_u == '-'  &&  c_d == '-') {
-	    errx(1, "multiple directional choices going %s from (%d,%d)", dir_name(cur_dir), *row_p, *col_p);
-	}
-	if (c_u != ' ') {
-	    (*row_p)--;
-	    return DIR_UP;
-	}
-	(*row_p)++;
-	return DIR_DOWN;
-
-    case DIR_DOWN:
-	printf("next char DOWN is '%c' at (%d,%d)\n", c_d, d.row, d.col);
-	if (isalpha(c_d)) {
-	    found_letters[num_found_letters++] = c_d;
-	    (*row_p)++;
-	    return DIR_DOWN;
-	}
-	if ('-' == c_d  ||  '|' == c_d) {
-	    (*row_p)++;
-	    return DIR_DOWN;
-	}
-	// have to turn or quit
-	if (c_d == ' ' &&  c_l == ' ' &&  c_r == ' ') {
-	    // reached the end
-	    break;
-	}
-	if (c_l == '-'  &&  c_r == '-') {
-	    errx(1, "multiple directional choices going %s from (%d,%d)", dir_name(cur_dir), *row_p, *col_p);
-	}
-	if (c_l != ' ') {
-	    (*col_p)--;
-	    return DIR_LEFT;
-	}
-	(*col_p)++;
-	return DIR_RIGHT;
-
-    case DIR_LEFT:
-	printf("next char LEFT is '%c' at (%d,%d)\n", c_l, l.row, l.col);
-	if (isalpha(c_l)) {
-	    found_letters[num_found_letters++] = c_l;
-	    (*col_p)--;
-	    return DIR_LEFT;
-	}
-	if ('-' == c_l  ||  '|' == c_l) {
-	    (*col_p)--;
-	    return DIR_LEFT;
-	}
-	// have to turn or quit
-	if (c_d == ' ' &&  c_l == ' ' &&  c_u == ' ') {
-	    // reached the end
-	    break;
-	}
-	if (c_d == '-'  &&  c_u == '-') {
-	    errx(1, "multiple directional choices going %s from (%d,%d)", dir_name(cur_dir), *row_p, *col_p);
-	}
-	if (c_d != ' ') {
-	    (*row_p)++;
-	    return DIR_DOWN;
-	}
-	(*row_p)--;
-	return DIR_UP;
     }
-    return DIR_LAST;
+    return cur_dir;
 }
 
 void walk_map(void)
@@ -229,13 +167,14 @@ void walk_map(void)
     // Find the start
     for(col = 0; (c = val_at(row, col)) == ' '; col++) {
     }
-    printf("Start is at (R%d,C%d)\n", row, col);
+    if (verbose) printf("Start is at (R%d,C%d)\n", row, col);
     direct_t d = DIR_DOWN;
+    step_count = 1;
     while (DIR_LAST != d) {
-	printf("%s from (%d,%d)\n", dir_name(d), row, col);
+	if (verbose) printf("%s from (%d,%d)\n", dir_name(d), row, col);
 	d = next_cell(d, &row, &col);
     }
-    printf("end is at (%d,%d) chars: %s\n", row, col, found_letters);
+    printf("end is at (%d,%d) after %d steps. Found chars: %s\n", row, col, step_count, found_letters);
 }
 
 int main(int argc, char **argv)
@@ -243,10 +182,13 @@ int main(int argc, char **argv)
     int c;
     char *filename = "adv17-19.input";
     
-    while ((c = getopt(argc, argv, "lf:t")) != EOF) {
+    while ((c = getopt(argc, argv, "vf:")) != EOF) {
 	switch (c) {
 	case 'f':
 	    filename = strdup(optarg);
+	    break;
+	case 'v':
+	    verbose = 1;
 	    break;
 	}
     }
