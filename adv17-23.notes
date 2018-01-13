@@ -1,0 +1,45 @@
+	set b 67		; b is counter: 67 for non-debug mode, 106700 for debug mode
+				; counts down 17 for each outer loop
+	set c b			; c is a constant: 67 for non-debug mode, 89700 for debug mode
+
+	jnz a 2			; if debug mode, diddle b and c
+	jnz 1 5
+	 mul b 100		; b = 6700
+	 sub b -100000		; b = 106700
+	 set c b
+	 sub c -17000		; c = 89700 (CONSTANT)
+	
+outer_loop:			; outer loop is for (b,c [as above]; b != c; b -= 17)
+	set f 1			; f is 'do not decrement h flag'
+	set d 2			; loop1 is for (d = 2; d != b; d++)
+loop1
+	set e 2			; loop2 is for (e = 2; e != b; e++)
+loop2:	
+	set g d			; if d*e == b then f=0
+	mul g e			; 
+	sub g b			; 
+	jnz g 2			; 
+	 set f 0		; allow h to be decremented (if d*e==b)
+	;; replace previous instruction with jnz 1 10 ; skip to h++
+
+	sub e -1		; e++
+	
+	set g e
+	sub g b
+	jnz g -8   		; loop2 (if e != b)
+	
+	sub d -1		; d++
+	set g d
+	sub g b
+	jnz g -13		; loop1 if d != b
+	
+ 	jnz f 2
+	sub h -1		; h++ : happens once per outer-loop, if at all
+	; h increments whenever b (for this iteration of the outer loop) has at least one factorization
+	
+	set g b			; if (b == c) break // TERMINATE
+	sub g c
+	jnz g 2
+	 jnz 1 3		; terminate if b != 89700
+	sub b -17		; ONLY TIME b is changed - 1000x through the outer-loop to exit
+	jnz 1 -23		; outer_loop

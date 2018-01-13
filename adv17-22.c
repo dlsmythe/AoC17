@@ -3,44 +3,84 @@
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <time.h>
 #include <err.h>
 #include <assert.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/queue.h>
+#include <limits.h>
 
-char found_letters[100];
-int num_found_letters;
+#define PART 2
+
+#define LENGTHOF(X) (sizeof(X)/sizeof((X)[0]))
+
 int verbose = 0;
+int num_bursts = 70;
 
-int numrows = 0;
-struct row_s {
-    char *data;
-    int len;
+typedef enum {
+    CELL_CLEAN,
+    CELL_INFECTED,
+    CELL_WEAKENED,
+    CELL_FLAGGED
+} cell_state_t;
+
+char state_char[4] = { '.', '#', 'W', 'F' };
+char *state_name[4] = { "CLEAN", "INFECTED", "WEAKENED", "FLAGGED" };
+
+cell_state_t next_state[4] = { CELL_WEAKENED, CELL_FLAGGED, CELL_INFECTED, CELL_CLEAN };
+
+struct cell_s {
+    STAILQ_ENTRY(cell_s) list;
+    int x;
+    int y;
+    cell_state_t state;
 };
-struct row_s map[1000];
 
-void add_row(char *s, int n)
+STAILQ_HEAD(map_s, cell_s) netmap = STAILQ_HEAD_INITIALIZER(netmap);
+
+struct cell_s *cell_at(int x, int y)
 {
-    map[numrows].len = n;
-    map[numrows].data = strdup(s);
-    numrows++;
+    struct cell_s *c;
+    STAILQ_FOREACH(c, &netmap, list) {
+	if (c->x == x  &&  c->y == y) {
+	    return c;
+	}
+    }
+    return NULL;
 }
 
-char val_at(int row, int col)
+cell_state_t cell_state(int x, int y)
 {
-    if (row < 0) {
-	return ' ';
+    struct cell_s *c;
+    c = cell_at(x,y);
+    return c ? c->state : CELL_CLEAN;
+}
+
+int cell_is_infected(int x, int y)
+{
+    return cell_state(x,y) == CELL_INFECTED;
+}
+
+struct cell_s *add_cell(int x, int y, cell_state_t state)
+{
+    struct cell_s *c = malloc(sizeof *c);
+    assert(c);
+//    printf("add_cell(%d,%d,%d)\n", x, y, state);
+    c->x = x;
+    c->y = y;
+    c->state = state;
+    STAILQ_INSERT_TAIL(&netmap, c, list);
+    return c;
+}
+
+void set_cell(int x, int y, cell_state_t state)
+{
+    struct cell_s *c;
+    c = cell_at(x,y);
+    if (c) {
+	c->state = state;
+    } else {
+	add_cell(x, y, state);
     }
-    if (col < 0) {
-	return ' ';
-    }
-    if (row >= numrows) {
-	return ' ';
-    }
-    if (col >= map[row].len) {
-	return ' ';
-    }
-    return map[row].data[col];
 }
 
 void read_map(char *fname)
@@ -51,12 +91,31 @@ void read_map(char *fname)
 	err(1, "fopen(%s)", fname);
     }
     char buf[300];
+    int width = 0, numrows = 0;
+    int y = 0;
     while (fgets(buf, sizeof buf, fp) != NULL) {
 	int len = strlen(buf);
 	if (buf[len-1] == '\n') {
 	    buf[--len] = '\0';
 	}
-	add_row(buf, len);
+	numrows++;
+	if (width == 0) {
+	    width = len;
+	    if (1 != (len%2)) {
+		errx(1, "grid must be of odd width");
+	    }
+	    y = width/2;
+	}
+	int x = -width/2;
+	int i;
+	for (i = 0; i < len; i++) {
+	    add_cell(x++, y, buf[i] == '#' ? CELL_INFECTED : CELL_CLEAN);
+	}
+	y--;
+    }
+    fclose(fp);
+    if (numrows != width) {
+	errx(1, "grid must be square");
     }
 }
 
@@ -68,6 +127,53 @@ typedef enum direct_e {
 
     DIR_LAST
 } direct_t;
+
+direct_t opposite_dir[4] = { DIR_DOWN, DIR_LEFT, DIR_UP, DIR_RIGHT };
+
+void print_map(direct_t cur_dir, int show_x, int show_y)
+{
+    struct cell_s *c;
+    int min_x = INT_MAX, min_y = INT_MAX, max_x = -INT_MAX, max_y = -INT_MAX;
+    
+    STAILQ_FOREACH(c, &netmap, list) {
+	if (c->x < min_x) {
+	    min_x = c->x;
+	}
+	if (c->y < min_y) {
+	    min_y = c->y;
+	}
+	if (c->x > max_x) {
+	    max_x = c->x;
+	}
+	if (c->y > max_y) {
+	    max_y = c->y;
+	}
+    }
+    if (show_x < min_x) {
+	min_x = show_x;
+    }
+    if (show_y < min_y) {
+	min_y = show_y;
+    }
+    if (show_x > max_x) {
+	max_x = show_x;
+    }
+    if (show_y > max_y) {
+	max_y = show_y;
+    }
+//    printf("limits: (%d,%d) (%d,%d)\n", min_x, min_y, max_x, max_y);
+    int x, y;
+    for (y = max_y; y >= min_y; y--) {
+	for (x = min_x; x <= max_x; x++) {
+	    struct cell_s *c = cell_at(x,y);
+	    printf("%c%c%c",
+		   (x == show_x  &&  y == show_y) ? '[':' ',
+		   c ? state_char[c->state] : '.',
+		   (x == show_x  &&  y == show_y) ? ']':' ');
+	}
+	printf("\n");
+    }
+}
 
 char *dir_name(direct_t d)
 {
@@ -83,14 +189,15 @@ char *dir_name(direct_t d)
 
 // dir_off[cur_dir] -> (x,y) offsets of next cell
 struct coord_s {
-    int row, col;
+    int x, y;
 } dir_off[DIR_LAST] = {
-    { -1, 0 },
     { 0, 1 },
     { 1, 0 },
-    { 0, -1 }
+    { 0, -1 },
+    { -1, 0 }
 };
 
+// turn_dir[direction-you-are-facing][direction-you-want-to-turn] = direction-you-will-be-facing
 direct_t turn_dir[4][4] = {
     { }, // UP
     { DIR_RIGHT, DIR_DOWN, DIR_LEFT, DIR_UP }, // turning RIGHT
@@ -99,102 +206,101 @@ direct_t turn_dir[4][4] = {
 };
 
 int step_count;
+int infect_count;
 
-int cell_in_dir(direct_t cur_dir, int cur_row, int cur_col, int *next_row_p, int *next_col_p)
+void go_forward(direct_t cur_dir, int *x_p, int *y_p)
 {
-    int r, c;
-    if (!next_row_p) {
-	next_row_p = &r;
-	next_col_p = &c;
-    }
-    *next_row_p = cur_row + dir_off[cur_dir].row;
-    *next_col_p = cur_col + dir_off[cur_dir].col;
-    return val_at(*next_row_p, *next_col_p);
+    *x_p += dir_off[cur_dir].x;
+    *y_p += dir_off[cur_dir].y;
 }
 
-int go_forward(direct_t cur_dir, int *row_p, int *col_p)
-{
-    int n_row, n_col;
-    char c = cell_in_dir(cur_dir, *row_p, *col_p, &n_row, &n_col);
-
-    if (' ' == c) {
-	return 0;
-    }
-    if (isalpha(c)) {
-	found_letters[num_found_letters++] = c;
-    }
-
-    *row_p = n_row;
-    *col_p = n_col;
-    return 1;
-}
-
-int turn(direct_t desired_turn, direct_t *cur_dir_p, int row, int col)
+direct_t turn(direct_t desired_turn, direct_t cur_dir, int x, int y)
 {
     assert(desired_turn == DIR_LEFT || desired_turn == DIR_RIGHT);
-    direct_t d = turn_dir[desired_turn][*cur_dir_p];
-    char c = cell_in_dir(d, row, col, NULL, NULL);
-
-    if (' ' == c) {
-	return 0;
-    }
-
-    *cur_dir_p = d;
-    return 1;
+    return turn_dir[desired_turn][cur_dir];
 }
 
-direct_t next_cell(direct_t cur_dir, int *row_p, int *col_p)
+direct_t next_cell(direct_t cur_dir, int *x_p, int *y_p)
 {
-    if (go_forward(cur_dir, row_p, col_p)) {
-	step_count++;
-    } else {
-	if (verbose) printf("Can't go fwd from (%d,%d)\n", *row_p, *col_p);
-	if (!turn(DIR_LEFT, &cur_dir, *row_p, *col_p)) {
-	    if (verbose) printf("Can't turn left from (%d,%d)\n", *row_p, *col_p);
-	    if (!turn(DIR_RIGHT, &cur_dir, *row_p, *col_p)) {
-		if (verbose) printf("Can't turn right from (%d,%d) - THE END!\n", *row_p, *col_p);
-		return DIR_LAST;
-	    }
-	}
+    cell_state_t cur_state = cell_state(*x_p, *y_p), new_state;
+    if (verbose) printf("Facing %s. ", dir_name(cur_dir));
+#if PART == 1
+    cur_dir = turn(cur_state == CELL_INFECTED ? DIR_RIGHT : DIR_LEFT, cur_dir, *x_p, *y_p);
+    new_state = cur_state == CELL_INFECTED ? CELL_CLEAN : CELL_INFECTED;
+#else
+    switch (cur_state) {
+    case CELL_CLEAN:
+	cur_dir = turn(DIR_LEFT, cur_dir, *x_p, *y_p);
+	break;
+    case CELL_INFECTED:
+	cur_dir = turn(DIR_RIGHT, cur_dir, *x_p, *y_p);
+	break;
+    case CELL_FLAGGED:
+	cur_dir = opposite_dir[cur_dir];
+	break;
+    case CELL_WEAKENED:
+	break;
     }
+    new_state = next_state[cur_state];
+#endif
+    if (verbose) printf("cell (%d,%d) is %s. Turning %s.\n", *x_p, *y_p, state_name[cur_state], dir_name(cur_dir));
+    set_cell(*x_p, *y_p, new_state);
+    infect_count += new_state == CELL_INFECTED;
+    go_forward(cur_dir, x_p, y_p);
+    step_count++;
     return cur_dir;
 }
 
 void walk_map(void)
 {
-    int row=0, col;
-    char c;
-    // Find the start
-    for(col = 0; (c = val_at(row, col)) == ' '; col++) {
+    int x = 0, y = 0, i;
+    direct_t d = DIR_UP;
+
+    struct timespec t0, t;
+    double t0secs, now;
+    clock_gettime(CLOCK_REALTIME, &t0);
+    t0secs = t0.tv_sec + (t0.tv_nsec / 1000000000.0);
+    printf("initial map, facing UP:\n");
+    print_map(d, x, y);
+    for (i = 0; i < num_bursts; i++) {
+	if (verbose) printf("%s from (%d,%d)\n", dir_name(d), x, y);
+	d = next_cell(d, &x, &y);
+	if (verbose > 1) print_map(d, x, y);
+#define PRINT_ITER_VAL 10000
+	if ((i%PRINT_ITER_VAL) == 0) {
+	    clock_gettime(CLOCK_REALTIME, &t);
+	    now = t.tv_sec + (t.tv_nsec / 1000000000.0);
+	    printf("%d %lf microsecs/iteration\n", i, (1000000*(now-t0secs))/PRINT_ITER_VAL);
+	}
     }
-    if (verbose) printf("Start is at (R%d,C%d)\n", row, col);
-    direct_t d = DIR_DOWN;
-    step_count = 1;
-    while (DIR_LAST != d) {
-	if (verbose) printf("%s from (%d,%d)\n", dir_name(d), row, col);
-	d = next_cell(d, &row, &col);
+    if (verbose) {
+	printf("final direction is %s:\n", dir_name(d));
+	print_map(d, x, y);
     }
-    printf("end is at (%d,%d) after %d steps. Found chars: %s\n", row, col, step_count, found_letters);
 }
 
 int main(int argc, char **argv)
 {
     int c;
-    char *filename = "adv17-19.input";
+    char *filename = "adv17-22.input";
     
-    while ((c = getopt(argc, argv, "vf:")) != EOF) {
+    while ((c = getopt(argc, argv, "vf:n:")) != EOF) {
 	switch (c) {
 	case 'f':
 	    filename = strdup(optarg);
 	    break;
+	case 'n':
+	    num_bursts = strtol(optarg, NULL, 0);
+	    break;
 	case 'v':
-	    verbose = 1;
+	    verbose++;
 	    break;
 	}
     }
 
     read_map(filename);
     walk_map();
-    
+    printf("Bursts caused %d infections\n", infect_count);
+
     return 0;
 }

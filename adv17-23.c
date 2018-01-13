@@ -12,9 +12,7 @@
 #include <err.h>
 #include <assert.h>
 
-#define PART 1
-
-#define LENGTHOF(X) (sizeof(X)/sizeof((X)[0]))
+int part = 1;
 
 typedef enum {
     OPC_SET,
@@ -40,37 +38,28 @@ typedef struct insn_s {
     int arg_is_constant;
 } insn_t;
 
-int program_id;
 insn_t *prog;
 int proglen, maxproglen;
 int trace = 0;
 
 int64_t regs[26];
 int regs_set[26];
-int64_t freqval;
-int freqval_set;
-
-int pfds[2][2];
-int pids[2];
 
 int only_print_valid_regs = 1;
 void print_regs(void)
 {
     int i;
-    if (!only_print_valid_regs  ||  freqval_set) {
-	printf("p%d:   freqval: %ld%s\n", program_id, freqval, freqval_set ? "":" (never set)");
-    }
     for (i = 0; i < 26; i++) {
 	if (only_print_valid_regs  &&  !regs_set[i]) {
 	    continue;
 	}
-	printf("%d:   reg %c: %ld%s\n", program_id, 'a'+i, regs[i], regs_set[i] ? "":" (never set)");
+	printf("   reg %c: %ld%s\n", 'a'+i, regs[i], regs_set[i] ? "":" (never set)");
     }
 }
 
 void print_insn(insn_t *i)
 {
-    printf("%d: %s ", program_id, opnames[i->opcode]);
+    printf("%s ", opnames[i->opcode]);
     if (i->reg_is_constant) {
 	printf("%d", i->reg);
     } else {
@@ -93,10 +82,10 @@ void print_program(void)
 {
     int pc;
     for (pc = 0; pc < proglen; pc++) {
-	printf("%d: %d: ", program_id, pc);
+	printf("%d: ", pc);
 	print_insn(&prog[pc]);
     }
-    printf("%d: ======================\n", program_id);
+    printf("======================\n");
 }
 
 int64_t get_reg(int t, int pc, int reg)
@@ -121,6 +110,16 @@ void add_insn(int opcode, int reg, int reg_is_constant, int arg, int arg_is_cons
 	maxproglen += 1000;
 	prog = realloc(prog, maxproglen * sizeof(insn_t));
 	assert(prog);
+    }
+    if (2 == part) {
+	if (OPC_SET == opcode  &&  !reg_is_constant  &&  reg == ('f'-'a')  &&  arg_is_constant  &&  0 == arg) {
+	    // patch in a jump to h++
+	    opcode = OPC_JNZ;
+	    reg_is_constant = 1;
+	    reg = 1;
+	    arg_is_constant = 1;
+	    arg = 10;
+	}
     }
     prog[proglen].opcode = opcode;
     prog[proglen].reg = reg;
@@ -185,21 +184,45 @@ void read_program(char *filename)
     }
 }
 
+#define R(X) ((X)-'a')
+
 void run_program(void)
 {
     int pc = 0, t;
+    int mulcnt = 0;
     int64_t reg, val;
-    printf("program %d (%ld) running\n", program_id, regs['p'-'a']);
+    printf("program running\n");
     for (t = 0; ; t++) {
 	if (pc < 0 || pc >= proglen) {
-	    printf("%d: Program terminated at time %d (pc=%d)\n", program_id, t, pc);
+	    printf("Program terminated at time %d (pc=%d)\n", t, pc);
+	    if (1 == part) {
+		printf("MUL count: %d\n", mulcnt);
+	    } else {
+		printf("Final value of reg h: %ld\n", get_reg(t, pc, R('h')));
+	    }
 	    return;
 	}
+	/* if ((t%1000000) == 0) { */
+	/*     printf("%d\n", t); */
+	/* } */
+	if (8 == pc) {
+	    printf("OUTER: b: %ld  c: %ld  h: %ld\n", get_reg(t, pc, R('b')), get_reg(t, pc, R('c')), get_reg(t, pc, R('h')));
+	}
+	if (10 == pc) {
+	    printf("  loop1: d: %ld  b: %ld\n", get_reg(t, pc, R('d')), get_reg(t, pc, R('b')));
+	}
+	if (10 == pc) {
+	    printf("  loop1: d: %ld  b: %ld\n", get_reg(t, pc, R('d')), get_reg(t, pc, R('b')));
+	}
+	if (11 == pc) {
+	    printf("    loop2: e: %ld  b: %ld\n", get_reg(t, pc, R('e')), get_reg(t, pc, R('b')));
+	}
 	if (trace) {
-	    printf("%d: => [%d] %d: ", program_id, t, pc);
+	    printf(" => [%d] %d: ", t, pc);
 	    print_insn(&prog[pc]);
 	    print_regs();
 	}
+	if (t > 100000) exit(1);
 	switch (prog[pc].opcode) {
 	default:
 	    break;
@@ -220,6 +243,7 @@ void run_program(void)
 	    val = prog[pc].arg_is_constant ? prog[pc].arg : get_reg(t, pc, prog[pc].arg);
 	    set_reg(prog[pc].reg, get_reg(t, pc, prog[pc].reg) * val);
 	    pc++;
+	    mulcnt++;
 	    break;
 	case OPC_JNZ:
 	    reg = prog[pc].reg_is_constant ? prog[pc].reg : get_reg(t, pc, prog[pc].reg);
@@ -240,7 +264,7 @@ int main(int argc, char **argv)
     char *filename = "adv17-23.input";
     int do_print = 0;
     
-    while ((c = getopt(argc, argv, "lf:t")) != EOF) {
+    while ((c = getopt(argc, argv, "lf:tp:")) != EOF) {
 	switch (c) {
 	case 'f':
 	    filename = strdup(optarg);
@@ -251,6 +275,9 @@ int main(int argc, char **argv)
 	case 'l':
 	    do_print = 1;
 	    break;
+	case 'p':
+	    part = strtol(optarg, NULL, 0);
+	    break;
 	}
     }
     
@@ -260,6 +287,9 @@ int main(int argc, char **argv)
     }
     printf("proglen %d\n", proglen);
 
+    if (2 == part) {
+	set_reg(0, 1);
+    }
     run_program();
     
     return 0;
