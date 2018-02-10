@@ -1,22 +1,26 @@
 ;;; Run with: sbcl --noinform --load adv17-05.lisp < adv17-05.input 
 ;;;  options:
 ;;;   -d <n>  enable debug level n
+;;;   -p <1|2> run problem part 1 or 2
 
 (ql:quickload "getopt" :silent t)
 
 (defparameter *debug* nil)
-(defparameter *part* 2)
+(defparameter *part* 1)
 
 (defun main (args)
   ;; Parse command-line options
-  (let ((opts '(("d" :required 0))))
+  (let ((opts '(("d" :required 0)
+		("p" :required 1))))
     (do ((targs (subseq args 1))
 	 (done nil))
 	((or (null targs) done) (setf args targs))
       (multiple-value-bind (new-args val) (getopt:getopt targs opts)
 	(if val
 	    (cond ((string= "d" (caar val))
-		   (setf *debug* (parse-integer (cdar val)))))
+		   (setf *debug* (parse-integer (cdar val))))
+		  ((string= "p" (caar val))
+		   (setf *part* (parse-integer (cdar val)))))
 	    (setf done t))
 	(setf targs new-args))))
 

@@ -4,8 +4,11 @@ import sys
 
 bankhist = {}
 
-banks = [ 11, 11, 13, 7, 0, 15, 5, 5, 4, 4, 1, 1, 7, 1, 15, 11 ]
-#banks = [ 0, 2, 7, 0 ]
+# This is the puzzle input. The answer to part 1 is 4074 and part 2 is 2793.
+#banks = [ 11, 11, 13, 7, 0, 15, 5, 5, 4, 4, 1, 1, 7, 1, 15, 11 ]
+
+# This is the example input.  The answer to part 1 should be 5 and part 2 is 4.
+banks = [ 0, 2, 7, 0 ]
 
 def checkhist():
     h = '{0}'.format(banks[0])
