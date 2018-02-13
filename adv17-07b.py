@@ -16,6 +16,7 @@ def parent(procname):
             if procname in p['subprocs']:
                 return p['name']
     rootprocname = procname
+    print "Root proc is {}".format(rootprocname)
     return None
 
 def read_procs():
@@ -29,11 +30,20 @@ def read_procs():
             sidx = string.find(line, '->')
             subs = None
             if sidx > 0:
+                sss = ''
                 tsubs = string.split(line[sidx+2:].strip(), ',')
                 subs = []
                 for s in tsubs:
                     subs.append(s.strip())
+                    sss += ' {}'.format(s.strip())
+                sss = '({})'.format(sss.strip())
+            else:
+                sss = 'NIL'
             proctab[procname] = { 'name': procname, 'weight': weight, 'subweight': 0, 'subprocs': subs }
+            # print "Read proc {} w: {} sw: {} sb: {}".format(
+            #     proctab[procname]['name'],
+            #     proctab[procname]['weight'],
+            #     proctab[procname]['subweight'], sss)
 
     for pn in proctab.keys():
         proctab[pn]['parentname'] = parent(pn)
@@ -53,6 +63,7 @@ def add_nodes_top_down(outq):
                 if child in closed_set:
                     continue
                 if child not in open_set:
+	            # print "Adding child {}".format(child)
                     open_set.append(child)
                     outq.append(child)
         closed_set.add(parentname)
@@ -73,10 +84,11 @@ def dump_procs():
     print '====================================='
     
 def calc_weights():
-    pq = deque([rootprocname])
+    pq = deque([])
     add_nodes_top_down(pq)
     while len(pq) > 0:
         pn = pq.pop()
+        # print "CALC-WEIGHTS({})".format(pn)
         if proctab[pn]['subprocs']:
             for subp in proctab[pn]['subprocs']:
                 proctab[pn]['subweight'] += proctab[subp]['weight'] + proctab[subp]['subweight']
