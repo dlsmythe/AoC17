@@ -1,6 +1,6 @@
 (defun read-input-file ()
   (with-output-to-string (out)
-    (with-open-file (in "/mnt/hgfs/C/cygwin64/home/dlsmyth/adv17-1.in")
+    (with-open-file (in "adv17-01.input")
       (let ((data (make-string (file-length in))))
 	(read-sequence data in)
 	;; (format t "len ~A data is ~A~%" (file-length in) data)
@@ -17,3 +17,5 @@
       (if (char= (char inbuf i) (char inbuf (OTHER i inbuflen)))
 	  (incf sum (- (char-code (char inbuf i)) (char-code #\0)))))
     (format t "~A~%" sum)))
+
+(sb-ext:exit :code 0)

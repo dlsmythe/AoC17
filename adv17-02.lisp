@@ -1,11 +1,10 @@
 
-(defparameter *PART* 2)
-
 (defun parse-vals (str)
   (with-input-from-string (s str) (loop for x = (read s nil nil) while x collect x)))
 
-(with-open-file (in "/mnt/hgfs/C/cygwin64/home/dlsmyth/adv17-2.in")
-  (let ((cksum 0))
+(with-open-file (in "adv17-02.input")
+  (let ((cksum1 0)
+	(cksum2 0))
     (do ((line (read-line in nil)
 	       (read-line in nil)))
 	((null line))
@@ -13,27 +12,33 @@
 	(let ((minval most-positive-fixnum)
 	      (maxval most-negative-fixnum)
 	      (result 0)
+	      (numerator 0)
+	      (divisor -1)
 	      (numvals (length vals)))
 	  (do* ((i 0 (1+ i))
 		(v (nth i vals) (nth i vals)))
 	       ((or (>= i numvals) (> 0 result)))
-	    (if (= *part* 1)
-		(progn
-		  (if (> v maxval)
-		      (setf maxval v))
-		  (if (< v minval)
-		      (setf minval v)))
-		(do ((j 0 (1+ j)))
-		    ((or (>= j numvals) (> 0 result)))
-		  (let ((v2 (nth j vals)))
-		    (unless (or (= i j) (= 0 v2))
-		      (if (= 0 (mod v v2))
-			  (setf result (/ v v2)))
-		      ;; NB: This test is unnecessary - it would be performed
-		      ;;      eventually in any case.  This is a just an optimization.
-		      (if (= 0 (mod v2 v))
-			  (setf result (/ v2 v))))))))
-	  (if (= *part* 1)
-	      (incf cksum (- maxval minval))
-	      (incf cksum result)))))
-    (format t "cksum is ~A~%" cksum)))
+	    (if (> v maxval)
+		(setf maxval v))
+	    (if (< v minval)
+		(setf minval v))
+	    (do ((j 0 (1+ j)))
+		((or (>= j numvals) (/= -1 divisor)))
+	      (let ((v2 (nth j vals)))
+		(unless (or (= i j) (= 0 v2))
+		  (cond ((= 0 (mod v v2))
+			 (setf numerator i)
+			 (setf divisor j))
+
+			;; NB: This test is unnecessary - it would be performed
+			;;      eventually in any case.  This is a just an optimization.
+			((= 0 (mod v2 v))
+			 (setf numerator j)
+			 (setf divisor i)))))))
+
+	      (incf cksum1 (- maxval minval))
+	      (incf cksum2 (/ (elt vals numerator) (elt vals divisor))))))
+    (format t "part 1 cksum is ~A~%" cksum1)
+    (format t "part 2 cksum is ~A~%" cksum2)))
+
+(sb-ext:exit :code 0)

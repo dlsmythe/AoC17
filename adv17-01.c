@@ -3,7 +3,7 @@
 #include <err.h>
 #include <string.h>
 
-char *infilename = "adv17-1.in";
+char *infilename = "adv17-01.input";
 
 int main(int argc, char **argv)
 {
