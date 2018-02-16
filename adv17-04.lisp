@@ -6,7 +6,7 @@
 (ql:quickload "split-sequence" :silent t)
 
 (defparameter *debug* nil)
-(defparameter *input-file* "/mnt/hgfs/C/cygwin64/home/dlsmyth/adv17-4a.actual_input")
+(defparameter *input-file* "adv17-04a.actual_input")
 
 (defun main (args)
   ;; Parse command-line options
