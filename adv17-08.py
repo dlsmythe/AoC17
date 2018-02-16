@@ -28,19 +28,22 @@ def update_reg(lineno, regname, op, arg):
 def pred_val(lineno, regname, op, arg):
     val = regval(regname)
     if op == '==':
-        return val == int(arg)
-    if op == '!=':
-        return val != int(arg)
-    if op == '<':
-        return val < int(arg)
-    if op == '<=':
-        return val <= int(arg)
-    if op == '>':
-        return val > int(arg)
-    if op == '>=':
-        return val >= int(arg)
-    print 'Error at line {0}: unknown relational operator "{1}"'.format(lineno, op)
-    sys.exit(1)
+        retval = val == int(arg)
+    elif op == '!=':
+        retval = val != int(arg)
+    elif op == '<':
+        retval = val < int(arg)
+    elif op == '<=':
+        retval = val <= int(arg)
+    elif op == '>':
+        retval = val > int(arg)
+    elif op == '>=':
+        retval = val >= int(arg)
+    else:
+        print 'Error at line {0}: unknown relational operator "{1}"'.format(lineno, op)
+        sys.exit(1)
+    # print "reg[{}] {} {} ? {}".format(regname, op, arg, "YES" if retval else "NO")
+    return retval
 
 def read_insns():
     prog = []
@@ -60,6 +63,14 @@ def read_insns():
         insn['predreg'] = m.group(4)
         insn['predop'] = m.group(5)
         insn['predarg'] = m.group(6)
+	# print "line {}: insn: [{} {} {} {} {} {} {}]".format(line.strip(),
+        #                                                      insn['line'],
+        #                                                      insn['destreg'],
+        #                                                      insn['destop'],
+        #                                                      insn['destarg'],
+        #                                                      insn['predreg'],
+        #                                                      insn['predop'],
+        #                                                      insn['predarg'])
         prog.append(insn)
     return prog
 
@@ -68,10 +79,12 @@ for i in prog:
     if pred_val(i['line'], i['predreg'], i['predop'], i['predarg']):
         update_reg(i['line'], i['destreg'], i['destop'], i['destarg'])
 
-print 'Regs at end:'
 rvs = []
 for k in regvals:
     rvs.append(regvals[k])
+regs = []
+for k in sorted(regvals.keys()):
+    regs.append(regvals[k])
 print 'largest val: {0}'.format(sorted(rvs)[-1])
 print 'largest ever: {0}'.format(regmaxval)
-print 'Regs at end: {0}'.format(rvs)
+print 'Regs at end: {0}'.format(regs)
