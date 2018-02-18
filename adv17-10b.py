@@ -16,6 +16,15 @@ def reverse_n_at(buf, n, pos):
     return tmp[0:l]
 
 # This is a round of the 'knot hash'
+def dump_round(rnum, inp):
+    print "round {}:".format(rnum)
+    for i in range(16):
+        s = ''
+        for j in range(16):
+            s += " {}".format(inp[i*16+j])
+        print s
+    print ''
+
 skip=0
 pos = 0
 def do_round(lengths, input):
@@ -32,15 +41,20 @@ def knot_hash(str):
 
     # Input string becomes the 'lengths' array
     lens = []
+    # s = ''
     for i in range(len(str)): 
         lens.append(ord(str[i]))
+        # s += " {}".format(ord(str[i]))
     lens += [ 17, 31, 73, 47, 23 ]
+    # s += ' 17 31 73 47 23'
+    # print 'lens: {}'.format(lens)
 
     # Do 64 rounds of knot-hash on the canonical input using the given input lengths
     skip = 0
     pos = 0
     inp = range(256)
     for rnum in range(64):
+        # dump_round(rnum, inp)
         inp = do_round(lens, inp)
 
     # Convert the 256-byte hashed input to 16-byte dense hash

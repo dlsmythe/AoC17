@@ -31,14 +31,17 @@ def reverse_n_at(buf, n, pos):
     return tmp[0:l]
 
 lengths = read_lengths()
+print "lens: {}".format(lengths)
 input_len = 256
-input = [x for x in range(input_len)]
+input = range(input_len)
 
 skip=0
 pos = 0
 for l in lengths:
+    print "len {} skip {} pos {}".format(l, skip, pos)
+    print "inp {}".format(input)
     input=reverse_n_at(input, l, pos)
-    print ' {0}'.format(input)
+    # print ' {0}'.format(input)
     pos += l+skip
     pos %= len(input)
     skip += 1
