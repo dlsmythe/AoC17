@@ -55,7 +55,10 @@
       (pos 0))
 
   ;; This is a round of the 'knot hash'
-  (defun knot-round (lengths input)
+  (defun knot-round (lengths input &key (reset-vars t))
+    (when reset-vars
+      (setf skip 0)
+      (setf pos 0))
     (loop for l across lengths do
 	 (progn
 	   (reverse-n-at input l pos)
@@ -80,7 +83,7 @@
       (setf pos 0)
       (dotimes (rnum 64)
 	;; (dump-round rnum inp)
-	(knot-round lens inp))
+	(knot-round lens inp :reset-vars nil))
 
       ;; Convert the 256-byte hashed input to 16-byte dense hash
       (let ((dense-hash (make-array '(16) :fill-pointer 0 :adjustable t)))
