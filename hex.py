@@ -211,7 +211,6 @@ def tile_at(x,y):
     tile['s'] = None
     tile['sw'] = None
     tile['nw'] = None
-    tile['seen'] = False
     tile['color'] = BLUE
 
     # hook up any already-existing neighbors
