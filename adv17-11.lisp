@@ -86,6 +86,8 @@
 
 (defparameter *tile-array* (make-array '(0) :fill-pointer 0 :adjustable t))
 
+;; ==========================================
+
 ;; Access with slot-value, e.g. (slot-value tile 'x)
 (defclass tile ()
   ((id :initarg :id :initform nil)
@@ -141,6 +143,8 @@
 				      +dir-list+)))
 	(dist (if (= 0 (tile-id tile)) 0 (dist-between 0 0 (tile-x tile) (tile-y tile)))))
     (format stream "~4:@a: (~8,2f, ~8,2f) dist: ~6,2f ~a~%" (tile-id tile) (tile-x tile) (tile-y tile) dist neighbors)))
+
+;; ==========================================
 
 (let ((once t))			   ; set to nil to see the format stmt
   (defun tile-coords (cx cy)
@@ -287,85 +291,6 @@
 
 ;; ==========================================
 
-;; def children-of(tileid):
-;;     ret = []
-;;     for dir in ['NORTH','NORTHEAST','SOUTHEAST','SOUTH','SOUTHWEST','NORTHWEST']:
-;;         if *tile-array*[tileid][dir]:
-;;             ret.append(*tile-array*[tileid][dir])
-;;     return ret
-
-;; class BFS:
-;;     def --init--(self, verbose=False):
-;;         self.open-set = deque([])
-;;         self.closed-set = set()
-;;         self.verbose = verbose
-;;         self.max-path-len = 0
-;;         self.max-path-tileid = 0
-;;         self.num-nodes-visited = 0
-
-;;     def next-best(self):
-;;         return self.open-set.popleft()
-
-;;     def add-children-to-frontier(self, parent):
-;;         for child in children-of(parent):
-;;             ;; if self.verbose:
-;;             ;;     print 'processing child {0}'.format(child)
-;;             if child in self.closed-set:
-;;                 ;; if self.verbose:
-;;                 ;;     print ' already processed'
-;;                 continue
-;;             if child not in self.open-set:
-;;                 ;; child.level = parent.level + 1
-;;                 ;; set child's path to current path + parent
-;;                 *tile-array*[child]['path'] = *tile-array*[parent]['path']+[parent]
-;;                 ;; if self.verbose:
-;;                 ;;     print ' adding child {0} to open-set with path {1}'.format(child, *tile-array*[child]['path'])
-;;                 self.open-set.append(child)
-;;                 sfo = steps-tooorigin(child)
-;;                 if sfo > self.max-path-len:
-;;                     self.max-path-len = sfo
-;;                     self.max-path-tileid = child
-
-;;     def search(self, goalnode):
-;;         self.goal-node = goalnode
-;;         self.open-set.append(0)
-;;         *tile-array*[0]['path'] = []
-;;         while len(self.open-set) > 0:
-;;             node = self.next-best()
-;;             self.num-nodes-visited += 1
-;;             if self.verbose:
-;;                 print 'VISITING node {0}'.format(node)
-;;             ;; here is the test for completion
-;;             if node == self.goal-node and not Part == 2:
-;;                 return *tile-array*[node]['path'] + [node]
-;;             self.add-children-to-frontier(node)
-;;             self.closed-set.add(node)
-;;         return None
-
-;; class TileBFS(BFS):
-
-;;     def --init--(self, verbose=False):
-;;         BFS.--init--(self, verbose)
-
-;;     def next-best(self):
-;;         min-node = None
-;;         min-val = len(*tile-array*)+1
-;;         if self.verbose and len(self.open-set) > 1:
-;;             print 'open-set {0}'.format(self.open-set)
-;;         for node in self.open-set:
-;;             len-to-here = len(*tile-array*[node]['path'])
-;;             if self.verbose and len(self.open-set) > 1:
-;;                 print 'frontier node {0} len-to-here: {1} min-val: {2} min-node: {3}'.format(node, len-to-here, min-val, min-node)
-;;             if len-to-here < min-val:
-;;                     min-val = len-to-here
-;;                     min-node = node
-;;         if self.verbose and len(self.open-set) > 1:
-;;             print 'selecting {0} as best frontier node with len {1}'.format(min-node, min-val)
-;;         self.open-set.remove(min-node)
-;;         return min-node
-
-;; ==========================================
-
 (defconstant +KEY-UP+ 273)
 (defconstant +KEY-DOWN+ 274)
 (defconstant +KEY-RIGHT+ 275)
@@ -404,29 +329,20 @@
 	   (when (> *scr-magnify* .01)
 	     (setf *scr-magnify* (* *scr-magnify* .9)))))))
 
-;; (defun draw-tile (tile)
-;;   (let ((coords (tile-coords (tile-x tile) (tile-y tile))))
-;;     (sdl2:draw-polygon *screen* (tile-color tile) coords (if (> *scr-magnify* .3) 2 0))
-;;     (when (> *scr-magnify* .3)
-;;       (sdl2:font-set-bold t)
-;;       (let* ((lbl (sld2:font-render (format nil "~A" (tile-id tile)) t *fg-color* *bg-color*))
-;; 	     (rect (sdl2:get-rect lbl)))
-;; 	(setf rect.center (cvt-to-scr (tile-x tile) (tile-y tile)))
-;;         (sdl2:blit screen lbl rect)))))
+(defun draw-tile (tile)
+  (let ((coords (tile-coords (tile-x tile) (tile-y tile))))
+    (sdl2:draw-polygon *screen* (tile-color tile) coords (if (> *scr-magnify* .3) 2 0))
+    (when (> *scr-magnify* .3)
+      (sdl2:font-set-bold t)
+      (let* ((lbl (sld2:font-render (format nil "~A" (tile-id tile)) t *fg-color* *bg-color*))
+	     (rect (sdl2:get-rect lbl)))
+	(setf rect.center (cvt-to-scr (tile-x tile) (tile-y tile)))
+        (sdl2:blit screen lbl rect)))))
 
 ;; =================================================================
 
 (defun main (args)
   (declare (ignore args))
-
-  ;; (sdl2:init())
-  ;; (setf *screen* (sdl2:display-set-mode *size*))
-
-  ;; (sdl2:display-set-caption "hex tile display for AoC2017-11")
-
-  ;; (setf *font* (sdl2:font-font nil (truncate (* +hex-width+ .4))))
-
-  ;; ==========================================
 
   (let ((child-steps (read-input "adv17-11.input"))
 	(tile (tile-at 0.0 0.0))    ; First, add the tile we start on.
@@ -455,48 +371,65 @@
     (format t "child ended ~A steps from the origin~%" (slot-value tile 'steps-to-origin))
 
     (format t "Longest distance from the start was ~a at node ~a~%" max-dist max-dist-tile)
-  
-    ;; Color the tiles chosen for the shortest path in GREEN, others in BLUE
-    ;; for id in path:
-    ;;     t = *tile-array*[id]
-    ;;     if t:
-    ;;         t['color'] = GREEN
-    ;;     else:
-    ;;         (format t "tile ~A on path but not in *tile-array*?~%" id)
 
-    ;; Loop until the user clicks the close button or types 'q'.
-  
-    ;; (do ((done nil)
-    ;;      (clock (sdl2:time-Clock)))
+    (sdl2:with-init (:everything)
+      (format t "Using SDL Library Version: ~D.~D.~D~%"
+	      sdl2-ffi:+sdl-major-version+
+	      sdl2-ffi:+sdl-minor-version+
+	      sdl2-ffi:+sdl-patchlevel+)
+      (finish-output)
 
-    ;;     (done)
+      (sdl2:with-window (win :flags '(:shown :opengl))
     
-    ;;   ;; This limits the while loop to a max of 10 times per second.
-    ;;   ;; Leave this out and we will use all CPU we can.
-    ;;   (sdl2:clock-tick 10)
+	(setf *screen* (sdl2:display-set-mode *size*))
     
-    ;;   (loop for event in (sdl2:event-get) ; User did something
-    ;; 	 (cond ((= event-type sdl2:QUIT) ; If user clicked close
-    ;; 		(setf done t)) ; Flag that we are done so we exit this loop
+	(sdl2:display-set-caption "hex tile display for AoC2017-11")
 
-    ;; 	       ;; key.--dict--: {'scancode': 113, 'key': 276, 'mod': 0}
-    ;; 	       ((= event-type (sdl2:KEYUP))
-    ;; 		;; (format t "key {0}'.format(event.--dict--)
-    ;; 		(if (= event.__dict__['key'] KEY-Q)
-    ;; 		    (setf done t)
-    ;; 		    (pan event.--dict--['key'])))))
+	(setf *font* (sdl2:font-font nil (truncate (* +hex-width+ .4))))
 
-    ;;   ;; Clear the screen and set the screen background
-    ;;   (sdl2:fill *screen* BLACK)
-
-    ;;   (loop for t across *tile-array* do (draw-tile t))
-    
-    ;;   ;; Go ahead and update the screen with what we've drawn.
-    ;;   ;; This MUST happen after all the other drawing commands.
-    ;;   (sdl2:display-flip))
+	;; ==========================================
   
-    ;; ;; Be IDLE friendly
-    ;; (sdl2:quit())
+	;; Color the tiles chosen for the shortest path in GREEN, others in BLUE
+	;; for id in path:
+	;;     t = *tile-array*[id]
+	;;     if t:
+	;;         t['color'] = GREEN
+	;;     else:
+	;;         (format t "tile ~A on path but not in *tile-array*?~%" id)
+
+	(format t "Beginning main loop.~%")
+	(finish-output)
+	(sdl2:with-event-loop (:method :poll)
+	  (:keydown (:keysym keysym)
+		    (let ((scancode (sdl2:scancode-value keysym))
+			  (sym (sdl2:sym-value keysym))
+			  (mod-value (sdl2:mod-value keysym)))
+		      (cond
+			((sdl2:scancode= scancode :scancode-q) (format t "~a~%" "WALK"))
+			((sdl2:scancode= scancode :scancode-s) (sdl2:show-cursor))
+			((sdl2:scancode= scancode :scancode-h) (sdl2:hide-cursor)))
+		      (format t "Key sym: ~a, code: ~a, mod: ~a~%"
+			      sym
+			      scancode
+			      mod-value)))
+
+	  (:keyup (:keysym keysym)
+		  (cond ((sdl2:scancode= (sdl2:scancode-value keysym) :scancode-q)
+			 (sdl2:push-event :quit))
+			(t
+			 (pan (sdl2:scancode-value keysym)))))
+
+	  (:idle ()
+		 ;; Clear the screen and set the screen background
+		 (sdl2:fill *screen* BLACK)
+
+		 (loop for t across *tile-array* do (draw-tile t))
+    
+		 ;; Go ahead and update the screen with what we've drawn.
+		 ;; This MUST happen after all the other drawing commands.
+		 (sdl2:display-flip))
+		 
+	  (:quit () t))))
   
     0))
 
