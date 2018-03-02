@@ -1,4 +1,12 @@
-;; sbcl --noinform --load adv17-13.lisp < adv17-13.input
+;; sbcl --noinform --load adv17-13.lisp [-v n] [-l n] [-h n] < adv17-13.input
+;;  -v n  set verbosity to level n
+;;  -l n  set low end of ranges of delays to consider to n
+;;  -h n  set high end of ranges of delays to consider to n
+;;
+;; Notes:
+;;  This is a translation of the second attempt at solving this one, in C.
+;;  There is still much room for improvement.  For instance, instead of representing
+;;  the state of the firewall as a list of layers, a vector would be much better.
 
 (proclaim '(optimize (speed 3) (safety 0)))
 ;;(proclaim '(optimize (debug 3) (speed 0) (safety 3)))
@@ -7,7 +15,9 @@
 (ql:quickload "cl-ppcre" :silent t)
 
 (defparameter *verbose* 0)
-(defparameter *max-depth* 0)
+(defparameter *max-depth* 0) ;; length of *node-heap* below should be this squared
+
+;; First, a few generic helper routines
 
 (defun join (separator list)
   (with-output-to-string (out)
@@ -25,53 +35,7 @@
              table)
     new-table))
 
-;;=========================================================
-
-(defclass layer ()
-  ((depth :initarg :depth :initform 0 :accessor layer-depth)
-   (range :initarg :range :initform 0 :accessor layer-range)
-   (scanpos :initarg :scanpos :initform 0 :accessor layer-scanpos)
-   (increment :initarg :increment :initform 1 :accessor layer-increment)))
-
-(defparameter *input-list* nil)
-(defparameter *node-heap* (make-array '(10000) :initial-element nil))
-(defparameter *last-free* 0)
-
-(defun node-alloc (d r s increment)
-  (let ((maxlen (length *node-heap*)))
-    (do ((i 0 (1+ i))
-	 (pos *last-free* (1+ pos)))
-	((= maxlen i))
-      (if (>= pos maxlen)
-	  (setf pos 0))
-      (let ((node (elt *node-heap* i)))
-	(unless node
-	  (setf node (make-instance 'layer :depth d :range r :scanpos s :increment increment))
-	  (setf (elt *node-heap* i) node)
-	  (return-from node-alloc node))
-	(when (= 0 (layer-range node))
-	  (setf (layer-range node) r)
-	  (setf (layer-depth node) d)
-	  (setf (layer-increment node) increment)
-	  (setf (layer-scanpos node) s)
-	  (setf *last-free* (1+ pos))
-	  (return-from node-alloc node)))))
-  (format t "heap exhausted")
-  (sb-ext:exit :code 1))
-
-(defun node-free (node)
-  (setf (layer-range node) 0))
-
-(defun free-node-list (l)
-  (mapcar #'node-free l))
-
-(defun copy-node-list (l)
-  (loop for n in l collect (node-alloc (layer-depth n) (layer-range n) (layer-scanpos n) (layer-increment n))))
-
-(defun find-node-with-depth (l depth)
-  (find-if (lambda (n) (= depth (layer-depth n))) l))
-
-;;===================================================================
+;;===========
 
 (defclass queue ()
   ((list :initform nil)
@@ -119,6 +83,61 @@
 (defmethod members ((queue queue))
   (slot-value queue 'list))
 
+;;=========================================================
+
+;; This defines the state of a particular layer within the firewall
+(defclass layer ()
+  ((index :initarg :index :initform 0 :accessor layer-index)
+   (depth :initarg :depth :initform 0 :accessor layer-depth)
+   (range :initarg :range :initform 0 :accessor layer-range)
+   (scanpos :initarg :scanpos :initform 0 :accessor layer-scanpos)
+   (increment :initarg :increment :initform 1 :accessor layer-increment)))
+
+;; This is the initial description of the firewall, read from the user.
+(defparameter *input-list* nil)
+
+;; This is a cache of class 'layer' objects, to avoid constant malloc/free
+(defparameter *node-heap* (make-array '(10000) :initial-element nil))
+
+;; This is an optimization for finding open slots in *node-heap*
+(defparameter *last-free* 0)
+
+(defun layer-alloc (d r s increment)
+  (let ((maxlen (length *node-heap*)))
+    (do ((i 0 (1+ i))
+	 (pos *last-free* (1+ pos)))
+	((= maxlen i))
+      (if (>= pos maxlen)
+	  (setf pos 0))
+      (let ((node (elt *node-heap* pos)))
+	(unless node
+	  (setf node (make-instance 'layer :index pos :depth d :range r :scanpos s :increment increment))
+	  (setf (elt *node-heap* pos) node)
+	  (setf *last-free* (1+ pos))
+	  (return-from layer-alloc node))
+	(when (= 0 (layer-range node))
+	  (setf (layer-range node) r)
+	  (setf (layer-depth node) d)
+	  (setf (layer-increment node) increment)
+	  (setf (layer-scanpos node) s)
+	  (setf *last-free* (1+ pos))
+	  (return-from layer-alloc node)))))
+  (format t "heap exhausted")
+  (sb-ext:exit :code 1))
+
+(defun layer-free (node)
+  (setf (layer-range node) 0))
+
+(defun free-layer-list (l)
+  (setf *last-free* (layer-index (car l)))
+  (mapcar #'layer-free l))
+
+(defun copy-layer-list (l)
+  (loop for n in l collect (layer-alloc (layer-depth n) (layer-range n) (layer-scanpos n) (layer-increment n))))
+
+(defun find-layer-with-depth (l depth)
+  (find-if (lambda (n) (= depth (layer-depth n))) l))
+
 ;;===================================================================
 
 ;; Keep the last 100 picoseconds of data so we don't have to keep regenerating it
@@ -138,7 +157,8 @@
     (let ((s (dequeue *simtimelist*)))
       (if (> *verbose* 1)
 	  (format t "Deleted state at time ~d~%" (fw-state-simtime s)))
-      (free-node-list (fw-state-layers s))
+      (free-layer-list (fw-state-layers s))
+      (setf (fw-state-layers s) nil) ;; hopefully avoid some garbage
       (decf *max-kept*))))
 
 (defun add-fw-state (s)
@@ -150,7 +170,7 @@
 
 ;; ====================
 
-;; returns a list of nodes
+;; returns a list of layer nodes
 (defun read-input ()
   (loop for line = (read-line *STANDARD-INPUT* nil)
      while line
@@ -165,11 +185,11 @@
 		      (rng   (parse-integer (elt l 1))))
 		 (if (> depth *max-depth*)
 		     (setf *max-depth* depth))
-		 (node-alloc depth rng 0 1)))))
+		 (layer-alloc depth rng 0 1)))))
 
 (defun prt-state (states pos)
   (dotimes (i (1+ *max-depth*))
-    (let ((n (find-node-with-depth states i)))
+    (let ((n (find-layer-with-depth states i)))
       (if (null n)
 	  (format t "~3d ~[...~;(.)~]~%" i (if (= i pos) 1 0))
 	  (let ((scanpos (layer-scanpos n))
@@ -195,7 +215,8 @@
 	    ((= -1 scanpos)
 	     (setf scanpos 1)
 	     (setf (layer-increment s) (- increment))))
-      (setf (layer-scanpos s) scanpos))))
+      (setf (layer-scanpos s) scanpos)))
+  state)
 
 ;; Returns a layer-list from a fw-state
 (defun fw-state-at-time (time)
@@ -215,28 +236,28 @@
 	    (format t "adding ~a missing states~%" num-missing))
 	(do ((i (1+ max-seen) (1+ i)))
 	    ((> i time))
-	  (when (and (> num-missing 1) (= (mod i 1000) 0))
+	  (when (and (> num-missing 1) (= (mod i 100000) 0))
 	    (format t "~a " i)
 	    (finish-output))
-	  ;; (format t "making state for time ~a~%" i)
+	  ;; The new state is either the original state at time 0, or just
+	  ;; the previous state, one tick later with the scanners advanced by one.
 	  (setf s (make-instance
 		   'fw-state
 		   :simtime i
 		   :layers (if (= 0 i)
-			       (copy-node-list *input-list*)
-			       (let ((l (copy-node-list (fw-state-layers prev))))
-				 (advance-scanners l)
-				 l))))
+			       (copy-layer-list *input-list*)
+			       (let ((l (copy-layer-list (fw-state-layers prev))))
+				 (advance-scanners l)))))
 	  (add-fw-state s)
 	  (setf prev s))
 	(if (> num-missing 1)
 	    (format t "Missing states added~%"))))
     (fw-state-layers s)))
 
-;; state is a list of layers (nodes)
+;; state is a list of layers
 ;; returns (caught severity)
 (defun check-caught (depth state)
-  (let ((n (find-node-with-depth state depth)))
+  (let ((n (find-layer-with-depth state depth)))
     (cond ((and n (= 0 (layer-scanpos n)))
 	   (if (> *verbose* 0)
 	       (format t "caught at depth ~a range ~a~%" depth (layer-range n)))
