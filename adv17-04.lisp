@@ -1,6 +1,12 @@
-;;; Run with: sbcl --noinform --load adv17-4.lisp
+;;; Run with: sbcl --noinform --load adv17-04.lisp
 ;;;  options:
 ;;;   -d <n>  enable debug level n
+;;;
+;;; New here:
+;;; - split-sequence
+;;; - copy-tree
+;;; - remove-duplicates (first crack at set operations)
+;;; - loop macro use
 
 (ql:quickload "getopt" :silent t)
 (ql:quickload "split-sequence" :silent t)
