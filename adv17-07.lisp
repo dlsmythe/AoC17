@@ -10,58 +10,11 @@
 (ql:quickload "cl-ppcre" :silent t)
 (ql:quickload "split-sequence" :silent t)
 
+(load "strings.lisp")
+(load "queues.lisp")
+
 (defparameter *debug* nil)
 (defparameter *part* 1)
-
-;;===================================================================
-
-(defclass queue ()
-  ((list :initform nil)
-   (tail :initform nil)))
-
-(defmethod print-object ((queue queue) stream)
-  (print-unreadable-object (queue stream :type t)
-    (with-slots (list tail) queue
-      (cond ((cddddr list)
-	     ;; at least five elements, so print ellipsis
-	     (format stream "(~{~S ~}... ~S)"
-		     (subseq list 0 3) (first tail)))
-	    ;; otherwise print whole list
-	    (t (format stream "~:S" list))))))
-
-(defgeneric dequeue (queue)
-  (:documentation "Remove the next item from the front of the queue."))
-
-(defgeneric enqueue (item queue)
-  (:documentation "Add an item to the end of the queue."))
-
-(defgeneric contains (item queue)
-  (:documentation "Return whether an item is in the queue."))
-
-(defgeneric empty (queue)
-  (:documentation "Return whether the queue is empty."))
-  
-(defmethod dequeue ((queue queue))
-  (with-slots (list) queue
-    (pop list)))
-
-(defmethod enqueue (new-item (queue queue))
-  (with-slots (list tail) queue
-    (let ((new-tail (list new-item)))
-      (cond ((null list) (setf list new-tail))
-	    (t (setf (cdr tail) new-tail)))
-      (setf tail new-tail)))
-  queue)
-
-(defmethod contains (item (queue queue))
-  (with-slots (list) queue
-      (find item list)))
-
-(defmethod empty ((queue queue))
-  (with-slots (list) queue
-      (null list)))
-
-;;===================================================================
 
 (defparameter *proctab* (make-hash-table :test 'equal))
 (defparameter *rootprocname* nil)
@@ -107,21 +60,21 @@
 
 (defun add-nodes-top-down ()
   (let ((outq nil)
-	(open-set (make-instance 'queue))
+	(open-set (make-instance 'dls:queue))
 	(closed-set nil))
     (push *rootprocname* outq)
-    (enqueue *rootprocname* open-set)
+    (dls:enqueue open-set *rootprocname*)
     (setf (gethash 'level (gethash *rootprocname* *proctab*)) 0)
     (do ()
-	((empty open-set))
-      (let* ((parentname (dequeue open-set))
+	((dls:empty open-set))
+      (let* ((parentname (dls:dequeue open-set))
 	     (parent (gethash parentname *proctab*)))
 	(dolist (child (gethash 'subprocs parent))
 	  (setf (gethash 'level (gethash child *proctab*)) (1+ (gethash 'level parent)))
 	  (unless (find child closed-set)
-	    (unless (contains child open-set)
+	    (unless (dls:contains open-set child)
 	      ;; (format t "Adding child ~A~%" child)
-	      (enqueue child open-set)
+	      (dls:enqueue open-set child)
 	      (push child outq))))
         (setf closed-set (remove-duplicates (push parentname closed-set)))))
     outq))
@@ -139,20 +92,13 @@
 	  (let ((subproc (gethash subp *proctab*)))
 	    (incf (gethash 'subweight proc) (+ (gethash 'weight subproc) (gethash 'subweight subproc)))))))))
 
-(defun join (separator list)
-  (with-output-to-string (out)
-    (loop for (element . more) on list
-       do (princ element out)
-       when more
-       do (princ separator out))))
-
 (defun dump-procs-work (pn)
   (let* ((proc (gethash pn *proctab*))
 	 (weight    (gethash 'weight proc))
 	 (subweight (gethash 'subweight proc))
 	 (subprocs  (gethash 'subprocs proc)))
     (format t "~A~A w: ~A sw: ~A total: ~A~%"
-	    (join "" (loop for i below (gethash 'level proc) collect "  "))
+	    (dls:join (loop for i below (gethash 'level proc) collect "  ") "")
 	    pn weight subweight (+ weight subweight))
     (dolist (child subprocs)
       (dump-procs-work child))))
