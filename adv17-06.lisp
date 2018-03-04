@@ -1,4 +1,11 @@
 ;;; Run with: sbcl --noinform --load adv17-06.lisp
+;;;
+;;; New here:
+;;; - join
+;;; - with-output-to-string
+;;; - generic functions
+;;; - loop "on" vs loop "across"
+;;; - loop over hash-keys
 
 (defparameter *debug* 0)
 
@@ -10,12 +17,18 @@
 
 (defparameter *bankhist* (make-hash-table :test 'equal))
 
+(defgeneric join (seq sep))
+(defmethod join ((l list) separator)
+  (with-output-to-string (out)
+    (loop for (element . more) on l
+	  do (princ element out)
+	  when more
+	  do (princ separator out))))
+(defmethod join ((v vector) separator)
+  (join (loop for i across v collect i) separator))
+
 (defun bank-str ()
-  (let ((h ""))
-    (do ((i 0 (1+ i))
-	 (dash "" "-"))
-	((= i (length *banks*)))
-      (setf h (format nil "~a~a~a" h dash (elt *banks* i)))) h))
+  (join *banks* "-"))
 
 (defun check-hist (cycle-number)
   (let* ((h (bank-str))
