@@ -1,15 +1,12 @@
-;;; Run with: sbcl --noinform --load adv17-09.lisp
+;;; Run with: sbcl --noinform --load adv17-09.lisp < adv17-09.input 
+;;;
+;;; New here:
+;;; - reading a file a character-at-a-time
+;;; - concatenate
 
 (defparameter *verbose* nil)
 (defparameter *score* 0)
 (defparameter *buf* nil)
-
-(defun join (separator list)
-  (with-output-to-string (out)
-    (loop for (element . more) on list
-       do (princ element out)
-       when more
-       do (princ separator out))))
 
 (defun read-input (fname)
   (let ((input nil)
