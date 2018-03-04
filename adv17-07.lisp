@@ -1,7 +1,13 @@
-;;; Run with: sbcl --noinform --load adv17-07.lisp
+;;; Run with: sbcl --noinform --load adv17-07.lisp < adv17-07.input
 ;;;  options:
 ;;;   -d <n>  enable debug level n
 ;;;   -p <1|2> run problem part 1 or 2
+;;;
+;;; New here:
+;;; - queues
+;;; - cl-ppcre
+;;; - loop over STDIN by lines
+;;; - string-trim
 
 (proclaim '(optimize (speed 3) (safety 0)))
 
@@ -124,7 +130,6 @@
 	    (setf done t))
 	(setf targs new-args))))
 
-  
   (read-procs)
   (calc-weights)
   ;; (dump-procs)
