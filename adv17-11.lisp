@@ -1,4 +1,12 @@
-;; sbcl --noinform --load adv17-11.lisp < adv17-11.input
+;;; sbcl --noinform --load adv17-11.lisp < adv17-11.input
+;;;
+;;; New here:
+;;; - math stuff
+;;; - defclass
+;;; - defconstant
+;;; - graphics (!)
+;;; - closures (e.g., tile-coords)
+;;; - floating-point format formatting
 
 (proclaim '(optimize (speed 3) (safety 0)))
 ;;(proclaim '(optimize (debug 3) (speed 0) (safety 3)))
@@ -6,6 +14,8 @@
 (ql:quickload "cl-mathstats" :silent t)
 (ql:quickload "sdl2" :silent t)
 (ql:quickload "split-sequence" :silent t)
+
+(load "strings.lisp")
 
 (defparameter *part* 1)
 
@@ -58,14 +68,6 @@
 		     (SOUTHWEST NORTHEAST)
 		     (NORTHWEST SOUTHEAST)))))
 
-(defun join (separator list)
-  "join strings in 'list' using string 'separator'. returns a string."
-  (with-output-to-string (out)
-    (loop for (element . more) on list
-       do (princ element out)
-       when more
-       do (princ separator out))))
-
 (defconstant +dir-list+ '(NORTH NORTHEAST SOUTHEAST SOUTH SOUTHWEST NORTHWEST))
 (defconstant +dir-alist+ '(("n" NORTH) ("ne" NORTHEAST) ("se" SOUTHEAST) ("s" SOUTH) ("sw" SOUTHWEST) ("nw" NORTHWEST)))
 
@@ -78,7 +80,7 @@
 			    (split-sequence:split-sequence #\, (string-trim '(#\Newline) (concatenate 'string buf))))))
 	(when nil
 	  (with-open-file (f "regnerated-input-path.txt" :direction :output :if-exists :supersede)
-	    (write-sequence (format nil "~a~%" (join #\, step-list)) f)))
+	    (write-sequence (format nil "~a~%" (dls:join step-list #\,)) f)))
 	(remove-if #'null step-list)))))
 
 (defconstant +TILE-HEIGHT+ (* 2 +cosd+))
@@ -137,10 +139,10 @@
   (dist-between-nodes (elt *tile-array* src) (elt *tile-array* dst)))
 
 (defmethod print-object ((tile tile) stream)
-  (let ((neighbors (join #\Space (map 'list (lambda (dir)
+  (let ((neighbors (dls:join (map 'list (lambda (dir)
 					      (let ((n (tile-neighbor tile dir)))
 						(if n (format nil "~2,,,' :@a: ~a~%" dir n) "")))
-				      +dir-list+)))
+				      +dir-list+)  #\Space))
 	(dist (if (= 0 (tile-id tile)) 0 (dist-between 0 0 (tile-x tile) (tile-y tile)))))
     (format stream "~4:@a: (~8,2f, ~8,2f) dist: ~6,2f ~a~%" (tile-id tile) (tile-x tile) (tile-y tile) dist neighbors)))
 
@@ -329,15 +331,15 @@
 	   (when (> *scr-magnify* .01)
 	     (setf *scr-magnify* (* *scr-magnify* .9)))))))
 
-(defun draw-tile (tile)
-  (let ((coords (tile-coords (tile-x tile) (tile-y tile))))
-    (sdl2:draw-polygon *screen* (tile-color tile) coords (if (> *scr-magnify* .3) 2 0))
-    (when (> *scr-magnify* .3)
-      (sdl2:font-set-bold t)
-      (let* ((lbl (sld2:font-render (format nil "~A" (tile-id tile)) t *fg-color* *bg-color*))
-	     (rect (sdl2:get-rect lbl)))
-	(setf rect.center (cvt-to-scr (tile-x tile) (tile-y tile)))
-        (sdl2:blit screen lbl rect)))))
+;; (defun draw-tile (tile)
+;;   (let ((coords (tile-coords (tile-x tile) (tile-y tile))))
+;;     (sdl2:draw-polygon *screen* (tile-color tile) coords (if (> *scr-magnify* .3) 2 0))
+;;     (when (> *scr-magnify* .3)
+;;       (sdl2:font-set-bold t)
+;;       (let* ((lbl (sld2:font-render (format nil "~A" (tile-id tile)) t *fg-color* *bg-color*))
+;; 	     (rect (sdl2:get-rect lbl)))
+;; 	(setf rect.center (cvt-to-scr (tile-x tile) (tile-y tile)))
+;;         (sdl2:blit screen lbl rect)))))
 
 ;; =================================================================
 
@@ -372,64 +374,64 @@
 
     (format t "Longest distance from the start was ~a at node ~a~%" max-dist max-dist-tile)
 
-    (sdl2:with-init (:everything)
-      (format t "Using SDL Library Version: ~D.~D.~D~%"
-	      sdl2-ffi:+sdl-major-version+
-	      sdl2-ffi:+sdl-minor-version+
-	      sdl2-ffi:+sdl-patchlevel+)
-      (finish-output)
+    ;; (sdl2:with-init (:everything)
+    ;;   (format t "Using SDL Library Version: ~D.~D.~D~%"
+    ;; 	      sdl2-ffi:+sdl-major-version+
+    ;; 	      sdl2-ffi:+sdl-minor-version+
+    ;; 	      sdl2-ffi:+sdl-patchlevel+)
+    ;;   (finish-output)
 
-      (sdl2:with-window (win :flags '(:shown :opengl))
+    ;;   (sdl2:with-window (win :flags '(:shown :opengl))
     
-	(setf *screen* (sdl2:display-set-mode *size*))
+    ;; 	(setf *screen* (sdl2:display-set-mode *size*))
     
-	(sdl2:display-set-caption "hex tile display for AoC2017-11")
+    ;; 	(sdl2:display-set-caption "hex tile display for AoC2017-11")
 
-	(setf *font* (sdl2:font-font nil (truncate (* +hex-width+ .4))))
+    ;; 	(setf *font* (sdl2:font-font nil (truncate (* +hex-width+ .4))))
 
-	;; ==========================================
+    ;; 	;; ==========================================
   
-	;; Color the tiles chosen for the shortest path in GREEN, others in BLUE
-	;; for id in path:
-	;;     t = *tile-array*[id]
-	;;     if t:
-	;;         t['color'] = GREEN
-	;;     else:
-	;;         (format t "tile ~A on path but not in *tile-array*?~%" id)
+    ;; 	;; Color the tiles chosen for the shortest path in GREEN, others in BLUE
+    ;; 	;; for id in path:
+    ;; 	;;     t = *tile-array*[id]
+    ;; 	;;     if t:
+    ;; 	;;         t['color'] = GREEN
+    ;; 	;;     else:
+    ;; 	;;         (format t "tile ~A on path but not in *tile-array*?~%" id)
 
-	(format t "Beginning main loop.~%")
-	(finish-output)
-	(sdl2:with-event-loop (:method :poll)
-	  (:keydown (:keysym keysym)
-		    (let ((scancode (sdl2:scancode-value keysym))
-			  (sym (sdl2:sym-value keysym))
-			  (mod-value (sdl2:mod-value keysym)))
-		      (cond
-			((sdl2:scancode= scancode :scancode-q) (format t "~a~%" "WALK"))
-			((sdl2:scancode= scancode :scancode-s) (sdl2:show-cursor))
-			((sdl2:scancode= scancode :scancode-h) (sdl2:hide-cursor)))
-		      (format t "Key sym: ~a, code: ~a, mod: ~a~%"
-			      sym
-			      scancode
-			      mod-value)))
+    ;; 	(format t "Beginning main loop.~%")
+    ;; 	(finish-output)
+    ;; 	(sdl2:with-event-loop (:method :poll)
+    ;; 	  (:keydown (:keysym keysym)
+    ;; 		    (let ((scancode (sdl2:scancode-value keysym))
+    ;; 			  (sym (sdl2:sym-value keysym))
+    ;; 			  (mod-value (sdl2:mod-value keysym)))
+    ;; 		      (cond
+    ;; 			((sdl2:scancode= scancode :scancode-q) (format t "~a~%" "WALK"))
+    ;; 			((sdl2:scancode= scancode :scancode-s) (sdl2:show-cursor))
+    ;; 			((sdl2:scancode= scancode :scancode-h) (sdl2:hide-cursor)))
+    ;; 		      (format t "Key sym: ~a, code: ~a, mod: ~a~%"
+    ;; 			      sym
+    ;; 			      scancode
+    ;; 			      mod-value)))
 
-	  (:keyup (:keysym keysym)
-		  (cond ((sdl2:scancode= (sdl2:scancode-value keysym) :scancode-q)
-			 (sdl2:push-event :quit))
-			(t
-			 (pan (sdl2:scancode-value keysym)))))
+    ;; 	  (:keyup (:keysym keysym)
+    ;; 		  (cond ((sdl2:scancode= (sdl2:scancode-value keysym) :scancode-q)
+    ;; 			 (sdl2:push-event :quit))
+    ;; 			(t
+    ;; 			 (pan (sdl2:scancode-value keysym)))))
 
-	  (:idle ()
-		 ;; Clear the screen and set the screen background
-		 (sdl2:fill *screen* BLACK)
+    ;; 	  (:idle ()
+    ;; 		 ;; Clear the screen and set the screen background
+    ;; 		 (sdl2:fill *screen* BLACK)
 
-		 (loop for t across *tile-array* do (draw-tile t))
+    ;; 		 (loop for t across *tile-array* do (draw-tile t))
     
-		 ;; Go ahead and update the screen with what we've drawn.
-		 ;; This MUST happen after all the other drawing commands.
-		 (sdl2:display-flip))
+    ;; 		 ;; Go ahead and update the screen with what we've drawn.
+    ;; 		 ;; This MUST happen after all the other drawing commands.
+    ;; 		 (sdl2:display-flip))
 		 
-	  (:quit () t))))
+    ;; 	  (:quit () t))))
   
     0))
 
