@@ -1,4 +1,11 @@
-;;; Run with: sbcl --noinform --load adv17-10.lisp <hashstr>
+;;; Run with: sbcl --noinform --load adv17-10.lisp [hashstr]
+;;;
+;;; New here:
+;;; - reduce
+;;; - labels
+;;; - coerce
+;;; - more complex "format" processing
+;;; - apply
 
 (ql:quickload "split-sequence" :silent t)
 (load "knot.lisp")
