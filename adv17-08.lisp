@@ -1,4 +1,7 @@
 ;;; Run with: sbcl --noinform --load adv17-08.lisp < adv17-08.input
+;;;
+;;; New here:
+;;; - working with sorted hash-keys (to facilitate comparing the final reg-state with the python version's)
 
 (ql:quickload "cl-ppcre" :silent t)
 
