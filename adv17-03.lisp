@@ -1,7 +1,14 @@
-;;; Run with: sbcl --noinform --load adv17-3.lisp
+;;; Run with: sbcl --noinform --load adv17-03.lisp
 ;;;  options:
 ;;;   -s <numshells>
 ;;;   -v <targetvalue>
+;;;
+;;; New here:
+;;;  - quickload
+;;;  - getopt
+;;;  - destructuring-bind
+;;;  - hash tables
+;;;  - extendable arrays/vectors
 
 (ql:quickload "getopt" :silent t)
 (defparameter *max-shells* 6)
