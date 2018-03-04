@@ -1,6 +1,6 @@
 (defpackage :dls
   (:use :common-lisp)
-  (:export :queue :print-object :dequeue :enqueue :contains :empty :members))
+  (:export :queue :print-object :dequeue :enqueue :contains :empty :members :nmembers))
 
 (in-package :dls)
 
@@ -49,3 +49,7 @@
 (defgeneric members (queue))
 (defmethod members ((queue queue))
   (slot-value queue 'list))
+
+(defgeneric nmembers (q))
+(defmethod nmembers ((q queue))
+  (length (slot-value q 'list)))
