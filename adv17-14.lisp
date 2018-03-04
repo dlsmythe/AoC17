@@ -1,6 +1,10 @@
-;; sbcl --noinform --load adv17-14.lisp [-v n] [-k keystr]
-;;  -v n    set verbosity to level n
-;;  -k str  provide an alternate key-string
+;;; sbcl --noinform --load adv17-14.lisp [-v n] [-k keystr]
+;;;  -v n    set verbosity to level n
+;;;  -k str  provide an alternate key-string
+;;;
+;;; New here:
+;;; - base conversions, using write-to-string and parse-integer
+;;; - two-dimensional array usage
 
 (proclaim '(optimize (speed 3) (safety 0)))
 ;;(proclaim '(optimize (debug 3) (speed 0) (safety 3)))
